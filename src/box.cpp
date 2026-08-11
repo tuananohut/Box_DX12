@@ -19,9 +19,6 @@ struct ObjectConstants
 
 struct Box
 {
-  ID3D12RootSignature  *m_RootSignature = nullptr;
-  ID3D12DescriptorHeap *m_DescriptorHeap = nullptr;
-
   
 };
 
