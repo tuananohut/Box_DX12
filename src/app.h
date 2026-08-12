@@ -1,13 +1,15 @@
 #ifndef APP_H
 #define APP_H
 
+#include <assert.h>
 #include <windows.h>
 #include <wrl.h>
 #include <dxgi1_4.h>
 #include <D3Dcompiler.h>
+#include <DirectXColors.h>
 #include <d3d12.h>
 
-#include "timer.h"
+#include "d3dx12.h"
 
 #pragma comment(lib,"d3dcompiler.lib")
 #pragma comment(lib, "D3D12.lib")
@@ -21,9 +23,6 @@ struct D3D
   HINSTANCE directx_instance = nullptr;
   HWND handle_window = nullptr;
   bool is_fullscreen = false;
-
-  bool m4x_msaa_state = false;
-  UINT m4x_msaa_quality = 0;
 
   Microsoft::WRL::ComPtr<IDXGIFactory4> dxgi_factory;
   Microsoft::WRL::ComPtr<IDXGISwapChain> swap_chain;
@@ -57,27 +56,25 @@ struct D3D
   DXGI_FORMAT depth_stencil_format = DXGI_FORMAT_D24_UNORM_S8_UINT;
   int width = 1080;
   int height = 720;
-
-  Timer timer;
 };
 
 bool Initialize_Main_Window(D3D *directx);
 
-bool Initialize_DirectX_App(D3D *directx, HINSTANCE instance);
-void Release_DirectX(D3D *directx); 
-
 bool Initialize_DirectX(D3D *directx);
+void Release_DirectX(D3D *directx); 
 
 int Run(D3D* directx);
 
-void LogAdapters(D3D* directx);
-void LogAdapterOutputs(D3D* directx, IDXGIAdapter* adapter);
-void LogOutputDisplayModes(D3D* directx, IDXGIOutput* output, DXGI_FORMAT format);
+void Render(D3D* directx); 
 
 void CreateCommandObjects(D3D* directx);
 void CreateSwapChain(D3D* directx);
 void CreateRtvAndDsvDescriptorHeaps(D3D* directx);
 
+void Update(D3D* directx);
+void Draw(D3D* directx);
+
+void FlushCommandQueue(D3D* directx);
 
 LRESULT CALLBACK
 Message_Proc(HWND wnd, UINT message, WPARAM w_param, LPARAM l_param); 

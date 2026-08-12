@@ -22,5 +22,4 @@ internal float4x4 Identity4x4()
     };
 }
 
-
 #endif
