@@ -11,7 +11,7 @@ typedef XMFLOAT3 float3;
 typedef XMFLOAT4 float4;
 typedef XMFLOAT4X4 float4x4; 
 
-internal float4x4 Identity4x4()
+static float4x4 Identity4x4()
 {
   return
     {
