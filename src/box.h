@@ -7,11 +7,14 @@
 #include <windows.h>
 #include <wrl.h>
 #include <unordered_map>
+#include <vector>
 #include <memory>
 #include <d3d12.h>
 #include <D3Dcompiler.h>
 #include <DirectXColors.h>
 #include <d3d12.h>
+#include <cmath>
+#include <array>
 
 #include "d3dx12.h"
 
@@ -55,6 +58,11 @@ Buffer Upload_Buffer(ID3D12Device *device,
 void Copy_Data(Buffer* buffer, int element_index, const ObjectConstants& data);
 
 
+static Microsoft::WRL::ComPtr<ID3DBlob> CompileShader(const LPCWSTR& filename,
+						      const D3D_SHADER_MACRO *defines,
+						      const LPCWSTR& entry_point,
+						      const LPCWSTR& target); 
+
 
 struct SubmeshGeometry
 {
@@ -97,9 +105,14 @@ struct Box
   Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature = nullptr;
   Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> cbv_heap = nullptr; 
 
-  std::unique_ptr<Buffer> object_cb = nullptr; 
+  Buffer *object_cb = nullptr; 
 
-  std::unique_ptr<MeshGeometry> box_geo = nullptr;
+  MeshGeometry *box_geo = nullptr;
+
+  Microsoft::WRL::ComPtr<ID3DBlob> vertex_shader_byte_code = nullptr;
+  Microsoft::WRL::ComPtr<ID3DBlob> pixel_shader_byte_code = nullptr;
+
+  std::vector<D3D12_INPUT_ELEMENT_DESC> input_layout; 
   
   Microsoft::WRL::ComPtr<ID3D12PipelineState> pso = nullptr; 
 
@@ -113,6 +126,7 @@ struct Box
 };
 
 bool Initialize_Box(D3D *directx, Box *box);
+void Release_Box(Box *box); 
 
 void Build_Desciptor_Heaps(ID3D12Device *device, Box *box);
 void Build_Constant_Buffers(ID3D12Device *device, Box *box);
@@ -120,5 +134,10 @@ void Build_Root_Signature(ID3D12Device *device, Box *box);
 void Build_Shaders_And_Input_Layout(ID3D12Device *device, Box *box);
 void Build_Box_Geometry(ID3D12Device *device, Box *box);
 void Build_PSO(ID3D12Device *device, Box *box); 
-  
+
+void Update(Box *box);
+void Draw(D3D* directx, Box *box);
+int Run(D3D *directx, Box *box);
+
+
 #endif

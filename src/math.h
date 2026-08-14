@@ -11,6 +11,10 @@ typedef XMFLOAT3 float3;
 typedef XMFLOAT4 float4;
 typedef XMFLOAT4X4 float4x4; 
 
+typedef XMVECTOR vec4;
+
+typedef XMMATRIX matrix; 
+
 static float4x4 Identity4x4()
 {
   return

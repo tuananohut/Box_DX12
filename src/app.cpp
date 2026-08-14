@@ -105,27 +105,6 @@ void Release_DirectX(D3D *directx)
     }
 }
 
-int Run(D3D* directx)
-{
-  MSG message = {0};
-
-  while(message.message != WM_QUIT)
-    {
-      if (PeekMessageW(&message, 0, 0, 0, PM_REMOVE))
-	{
-	  TranslateMessage(&message);
-	  DispatchMessageW(&message); 
-	}
-      else
-	{
-	  Update(directx);
-	  Draw(directx);
-	}
-    }
-
-  return (int)message.wParam;  
-}
-
 void Render(D3D* directx)
 {
   HRESULT result;
@@ -308,60 +287,6 @@ void CreateRtvAndDsvDescriptorHeaps(D3D* directx)
     {
       MessageBoxW(0, L"CreateDescriptorHeap DSV Failed!", 0, MB_OK | MB_ICONERROR);
     }
-}
-
-void Update(D3D* directx) {}
-
-void Draw(D3D* directx)
-{
-  directx->direct_cmd_list_alloc->Reset();
-
-  directx->command_list->Reset(directx->direct_cmd_list_alloc.Get(), nullptr);
-
-  directx->command_list->ResourceBarrier(1,
-					 &CD3DX12_RESOURCE_BARRIER::Transition(directx->swap_chain_buffer[directx->current_back_buffer].Get(),
-									       D3D12_RESOURCE_STATE_PRESENT,
-									       D3D12_RESOURCE_STATE_RENDER_TARGET));
-
-  directx->command_list->RSSetViewports(1, &directx->screen_viewport);
-  directx->command_list->RSSetScissorRects(1, &directx->scissor_rect);
-
-  directx->command_list->ClearRenderTargetView(CD3DX12_CPU_DESCRIPTOR_HANDLE(directx->rtv_heap->GetCPUDescriptorHandleForHeapStart(),
-									   directx->current_back_buffer,
-									   directx->rtv_descriptor_size),
-					       DirectX::Colors::MediumPurple,
-					       0, nullptr);
-  directx->command_list->ClearDepthStencilView(directx->dsv_heap->GetCPUDescriptorHandleForHeapStart(),
-					       D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL,
-					       1.f, 0, 0, nullptr);
-
-  directx->command_list->OMSetRenderTargets(1,
-					    &CD3DX12_CPU_DESCRIPTOR_HANDLE(directx->rtv_heap->GetCPUDescriptorHandleForHeapStart(),
-									   directx->current_back_buffer,
-									   directx->rtv_descriptor_size),
-					    true,
-					    &directx->dsv_heap->GetCPUDescriptorHandleForHeapStart());
-
-  directx->command_list->ResourceBarrier(1,
-					 &CD3DX12_RESOURCE_BARRIER::Transition(directx->swap_chain_buffer[directx->current_back_buffer].Get(),
-									       D3D12_RESOURCE_STATE_RENDER_TARGET,
-									       D3D12_RESOURCE_STATE_PRESENT));
-
-  HRESULT result;
-
-  result = directx->command_list->Close();
-  if (FAILED(result))
-    {
-      MessageBoxW(0, L"directx->command_list->Close() Failed!", 0, MB_OK | MB_ICONERROR);
-    }
-
-  ID3D12CommandList *cmd_lists[] = { directx->command_list.Get() };
-  directx->command_queue->ExecuteCommandLists(_countof(cmd_lists), cmd_lists);
-
-  directx->swap_chain->Present(0, 0);
-  directx->current_back_buffer = (directx->current_back_buffer + 1) % directx->swap_chain_buffer_count;
-
-  FlushCommandQueue(directx); 
 }
 
 void FlushCommandQueue(D3D* directx)

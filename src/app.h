@@ -69,16 +69,11 @@ bool Initialize_Main_Window(D3D *directx);
 bool Initialize_DirectX(D3D *directx);
 void Release_DirectX(D3D *directx); 
 
-int Run(D3D* directx);
-
 void Render(D3D* directx); 
 
 void CreateCommandObjects(D3D* directx);
 void CreateSwapChain(D3D* directx);
 void CreateRtvAndDsvDescriptorHeaps(D3D* directx);
-
-void Update(D3D* directx);
-void Draw(D3D* directx);
 
 void FlushCommandQueue(D3D* directx);
 
