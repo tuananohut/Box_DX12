@@ -147,14 +147,14 @@ void Release_Box(Box *box)
 {
   if (box->object_cb)
     {
-      box->object_cb = nullptr;
       delete box->object_cb; 
+      box->object_cb = nullptr;
     }
 
   if (box->box_geo)
     {
-      box->box_geo = nullptr;
       delete box->box_geo; 
+      box->box_geo = nullptr;
     }
 }
 
