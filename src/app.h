@@ -60,8 +60,8 @@ struct D3D
   D3D_DRIVER_TYPE d3d_driver_type = D3D_DRIVER_TYPE_HARDWARE;
   DXGI_FORMAT back_buffer_format = DXGI_FORMAT_R8G8B8A8_UNORM;
   DXGI_FORMAT depth_stencil_format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-  int width = 1080;
-  int height = 720;
+  int width = 1920;
+  int height = 1080;
 };
 
 bool Initialize_Main_Window(D3D *directx);

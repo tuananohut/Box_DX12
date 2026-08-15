@@ -1,5 +1,7 @@
 # Rendering Box with DirectX 12
 
+![DirectX 12 Cube](box_dx12.gif)
+
 I am learning DirectX 12 and I am sharing my learning journey on Substack:
 
 Devlog-0: https://tuananohutt.substack.com/p/directx-12-ile-kup-renderlamak-0?r=3mi3ld&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true
@@ -11,6 +13,8 @@ Devlog-2: https://tuananohutt.substack.com/p/directx-12-ile-kup-renderlamak-2?r=
 Devlog-3: https://tuananohutt.substack.com/p/directx-12-ile-kup-renderlamak-3?r=3mi3ld&utm_campaign=post-expanded-share&utm_medium=web
 
 Devlog-4: https://tuananohutt.substack.com/p/directx-12-ile-kup-renderlamak-4?r=3mi3ld&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true
+
+Devlog-5: https://tuananohutt.substack.com/p/directx-12-ile-kup-renderlamak-5?r=3mi3ld&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true
 
 P.S: I prefer writing in Turkish. If you can't speak Turkish, you can use translate or an AI tool to read it. 
 

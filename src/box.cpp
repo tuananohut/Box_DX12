@@ -70,15 +70,68 @@ static Microsoft::WRL::ComPtr<ID3DBlob> CompileShader(const LPCWSTR& filename,
   result = D3DCompileFromFile(filename, defines, D3D_COMPILE_STANDARD_FILE_INCLUDE, entry_point, target, compile_flags, 0, &byte_code, &errors); 
   if (errors != nullptr)
     {
-      MessageBoxW(0, L"Shader has bug!", 0, MB_OK | MB_ICONERROR);
+      MessageBoxA(0, (char*)errors->GetBufferPointer(), "Shader Compile Error", MB_OK | MB_ICONERROR);
     }
 
   if (FAILED(result))
     {
       MessageBoxW(0, L"D3DCompileFromFile Failed!", 0, MB_OK | MB_ICONERROR);
+      return nullptr;
     }
 
   return byte_code; 
+}
+
+
+static Microsoft::WRL::ComPtr<ID3D12Resource> CreateDefaultBuffer(ID3D12Device *device,
+								  ID3D12GraphicsCommandList *cmd_list,
+								  const void *init_data,
+								  UINT64 byte_size,
+								  Microsoft::WRL::ComPtr<ID3D12Resource>& resource_buffer)
+{
+  HRESULT result; 
+  
+  Microsoft::WRL::ComPtr<ID3D12Resource> default_buffer;
+
+  result = device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+					   D3D12_HEAP_FLAG_NONE,
+					   &CD3DX12_RESOURCE_DESC::Buffer(byte_size),
+					   D3D12_RESOURCE_STATE_COMMON,
+					   nullptr,
+					   IID_PPV_ARGS(default_buffer.GetAddressOf()));
+  if (FAILED(result))
+    {
+      MessageBoxW(0, L"device->CreateCommittedResource Failed!", 0, MB_OK | MB_ICONERROR);  
+    }
+
+
+  result = device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+					   D3D12_HEAP_FLAG_NONE,
+					   &CD3DX12_RESOURCE_DESC::Buffer(byte_size),
+					   D3D12_RESOURCE_STATE_GENERIC_READ,
+					   nullptr,
+					   IID_PPV_ARGS(resource_buffer.GetAddressOf()));
+  if (FAILED(result))
+    {
+      MessageBoxW(0, L"device->CreateCommittedResource Failed!", 0, MB_OK | MB_ICONERROR);  
+    }
+
+  D3D12_SUBRESOURCE_DATA sub_resource_data = {};
+  sub_resource_data.pData = init_data;
+  sub_resource_data.RowPitch = byte_size;
+  sub_resource_data.SlicePitch = sub_resource_data.RowPitch;
+
+  cmd_list->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(default_buffer.Get(),
+								     D3D12_RESOURCE_STATE_COMMON,
+								     D3D12_RESOURCE_STATE_COPY_DEST));
+
+  UpdateSubresources<1>(cmd_list, default_buffer.Get(), resource_buffer.Get(), 0, 0, 1, &sub_resource_data);
+
+  cmd_list->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(default_buffer.Get(),
+								     D3D12_RESOURCE_STATE_COPY_DEST,
+								     D3D12_RESOURCE_STATE_GENERIC_READ));
+
+  return default_buffer; 
 }
 
 
@@ -124,9 +177,17 @@ bool Initialize_Box(D3D* directx, Box *box)
   Build_Desciptor_Heaps(directx->d3d12_device.Get(), box);
   Build_Constant_Buffers(directx->d3d12_device.Get(), box);
   Build_Root_Signature(directx->d3d12_device.Get(), box);
-  Build_Shaders_And_Input_Layout(directx->d3d12_device.Get(), box);
-  Build_Box_Geometry(directx->d3d12_device.Get(), box);
-  Build_PSO(directx->d3d12_device.Get(), box); 
+  Build_Shaders_And_Input_Layout(box);
+  Build_Box_Geometry(directx->d3d12_device.Get(), directx->command_list.Get(), box);
+  Build_PSO(directx->d3d12_device.Get(),
+	    directx->back_buffer_format,
+	    directx->depth_stencil_format,
+	    box);
+
+  matrix projection = XMMatrixPerspectiveFovLH(0.25f*XM_PI,
+					       static_cast<float>(directx->width) / directx->height,
+					       1.f, 1000.f);
+  XMStoreFloat4x4(&box->projection, projection); 
   
   result = directx->command_list->Close();
   if (FAILED(result))
@@ -142,7 +203,7 @@ bool Initialize_Box(D3D* directx, Box *box)
 
   return true; 
 }
-
+ 
 void Release_Box(Box *box)
 {
   if (box->object_cb)
@@ -177,7 +238,7 @@ void Build_Desciptor_Heaps(ID3D12Device *device, Box *box)
 
 void Build_Constant_Buffers(ID3D12Device *device, Box *box)
 {
-  box->object_cb = &Upload_Buffer(device, 1, true);
+  box->object_cb = new Buffer(Upload_Buffer(device, 1, true));
 
   UINT object_cb_byte_size = Calculate_Constant_Buffer_Byte_Size(sizeof(ObjectConstants));
 
@@ -226,8 +287,8 @@ void Build_Shaders_And_Input_Layout(Box *box)
 {
   HRESULT result = S_OK;
 
-  box->vertex_shader_byte_code = CompileShader(L"color.hlsl", nullptr, "ColorVertexShader", "vs_5_0");
-  box->pixel_shader_byte_code = CompileShader(L"color.hlsl", nullptr, "ColorPixelShader", "ps_5_0");
+  box->vertex_shader_byte_code = CompileShader(L"../shader/color.hlsl", nullptr, "ColorVertexShader", "vs_5_0");
+  box->pixel_shader_byte_code = CompileShader(L"../shader/color.hlsl", nullptr, "ColorPixelShader", "ps_5_0");
   
   box->input_layout =
     {
@@ -248,18 +309,20 @@ void Build_Shaders_And_Input_Layout(Box *box)
     };
 }
 
-void Build_Box_Geometry(ID3D12Device *device, Box *box)
+void Build_Box_Geometry(ID3D12Device *device,
+			ID3D12GraphicsCommandList* command_list,
+			Box *box)
 {
   std::array<Vertex, 8> vertices =
     {
-      Vertex({ float3(-1.f, -1.f, -1.f), float4(DirectX::Colors::White  ) }),
-      Vertex({ float3(-1.f,  1.f, -1.f), float4(DirectX::Colors::Black  ) }),
-      Vertex({ float3( 1.f,  1.f, -1.f), float4(DirectX::Colors::Red    ) }),
-      Vertex({ float3( 1.f, -1.f, -1.f), float4(DirectX::Colors::Green  ) }),
-      Vertex({ float3(-1.f, -1.f,  1.f), float4(DirectX::Colors::Blue   ) }),
-      Vertex({ float3(-1.f,  1.f,  1.f), float4(DirectX::Colors::Yellow ) }),
-      Vertex({ float3( 1.f,  1.f,  1.f), float4(DirectX::Colors::Cyan   ) }),
-      Vertex({ float3( 1.f, -1.f,  1.f), float4(DirectX::Colors::Magenta) }),
+      Vertex({ float3(-1.f, -1.f, -1.f), float4(DirectX::Colors::MidnightBlue	) }),
+      Vertex({ float3(-1.f,  1.f, -1.f), float4(DirectX::Colors::CornflowerBlue	) }),
+      Vertex({ float3( 1.f,  1.f, -1.f), float4(DirectX::Colors::Plum		) }),
+      Vertex({ float3( 1.f, -1.f, -1.f), float4(DirectX::Colors::Indigo		) }),
+      Vertex({ float3(-1.f, -1.f,  1.f), float4(DirectX::Colors::MediumVioletRed) }),
+      Vertex({ float3(-1.f,  1.f,  1.f), float4(DirectX::Colors::Pink		) }),
+      Vertex({ float3( 1.f,  1.f,  1.f), float4(DirectX::Colors::Orchid		) }),
+      Vertex({ float3( 1.f, -1.f,  1.f), float4(DirectX::Colors::DarkMagenta    ) }),
     };
 
   std::array<std::uint16_t, 36> indices =
@@ -286,6 +349,7 @@ void Build_Box_Geometry(ID3D12Device *device, Box *box)
   const UINT vertex_buffer_byte_size = (UINT)vertices.size() * sizeof(Vertex);
   const UINT index_buffer_byte_size = (UINT)indices.size() * sizeof(std::uint16_t);
 
+  box->box_geo = new MeshGeometry; 
   box->box_geo->name = L"box_geo";
 
   HRESULT result = D3DCreateBlob(vertex_buffer_byte_size,
@@ -304,15 +368,66 @@ void Build_Box_Geometry(ID3D12Device *device, Box *box)
     }
   CopyMemory(box->box_geo->index_buffer_cpu->GetBufferPointer(), indices.data(), index_buffer_byte_size);
 
-  
-  // Add CreateDefaultBuffer
-  
-  
+  box->box_geo->vertex_buffer_gpu = CreateDefaultBuffer(device,
+							command_list,
+							vertices.data(),
+							vertex_buffer_byte_size,
+							box->box_geo->vertex_buffer_uploader); 
+
+  box->box_geo->index_buffer_gpu = CreateDefaultBuffer(device,
+						       command_list,
+						       indices.data(),
+						       index_buffer_byte_size,
+						       box->box_geo->index_buffer_uploader);
+
+  box->box_geo->vertex_byte_stride = sizeof(Vertex);
+  box->box_geo->vertex_buffer_byte_size = vertex_buffer_byte_size;
+  box->box_geo->index_format = DXGI_FORMAT_R16_UINT;
+  box->box_geo->index_buffer_byte_size = index_buffer_byte_size;
+
+  SubmeshGeometry submesh;
+  submesh.index_count = (UINT)indices.size();
+  submesh.start_index_location = 0;
+  submesh.base_vertex_location = 0;
+
+  box->box_geo->draw_args[L"box"] = submesh; 
 }
 
-void Build_PSO(ID3D12Device *device, Box *box)
+void Build_PSO(ID3D12Device *device,
+	       DXGI_FORMAT back_buffer_format,
+	       DXGI_FORMAT depth_stencil_format,
+	       Box *box)
 {
-  
+  D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc;
+  ZeroMemory(&pso_desc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
+  pso_desc.InputLayout = { box->input_layout.data(), (UINT)box->input_layout.size() };
+  pso_desc.pRootSignature = box->root_signature.Get();
+  pso_desc.VS =
+    {
+      reinterpret_cast<BYTE*>(box->vertex_shader_byte_code->GetBufferPointer()),
+      box->vertex_shader_byte_code->GetBufferSize()
+    };
+  pso_desc.PS =
+    {
+      reinterpret_cast<BYTE*>(box->pixel_shader_byte_code->GetBufferPointer()),
+      box->pixel_shader_byte_code->GetBufferSize()
+    };
+  pso_desc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+  pso_desc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+  pso_desc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+  pso_desc.SampleMask = UINT_MAX;
+  pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+  pso_desc.NumRenderTargets = 1;
+  pso_desc.RTVFormats[0] = back_buffer_format;
+  pso_desc.SampleDesc.Count = 1;
+  pso_desc.SampleDesc.Quality = 0;
+  pso_desc.DSVFormat = depth_stencil_format;
+
+  HRESULT result = device->CreateGraphicsPipelineState(&pso_desc, IID_PPV_ARGS(&box->pso));
+  if (FAILED(result))
+    {
+      MessageBoxW(0, L"device->CreateGraphicsPipelineState Failed!", 0, MB_OK | MB_ICONERROR);
+    }
 }
 
 
@@ -331,9 +446,18 @@ void Update(Box *box)
   XMStoreFloat4x4(&box->view, view);
 
   matrix world = XMLoadFloat4x4(&box->world);
+
+  static float rotation = 0.f;   
+  rotation -= 0.0174532925f * 0.5f;
+  if(rotation < 0.f)
+    {
+      rotation += XM_2PI;
+    }
+  
+  world = XMMatrixRotationY(rotation) * XMMatrixRotationX(rotation);
   matrix projection = XMLoadFloat4x4(&box->projection);
   matrix world_view_projection = world*view*projection;
-
+  
   ObjectConstants object_constants;
   XMStoreFloat4x4(&object_constants.WorldViewProj, XMMatrixTranspose(world_view_projection));
   Copy_Data(box->object_cb, 0, object_constants);
@@ -356,7 +480,7 @@ void Draw(D3D *directx, Box *box)
   directx->command_list->ClearRenderTargetView(CD3DX12_CPU_DESCRIPTOR_HANDLE(directx->rtv_heap->GetCPUDescriptorHandleForHeapStart(),
 									   directx->current_back_buffer,
 									   directx->rtv_descriptor_size),
-					       DirectX::Colors::MediumPurple,
+					       DirectX::Colors::Black,
 					       0, nullptr);
   directx->command_list->ClearDepthStencilView(directx->dsv_heap->GetCPUDescriptorHandleForHeapStart(),
 					       D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL,

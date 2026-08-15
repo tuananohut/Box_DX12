@@ -60,8 +60,14 @@ void Copy_Data(Buffer* buffer, int element_index, const ObjectConstants& data);
 
 static Microsoft::WRL::ComPtr<ID3DBlob> CompileShader(const LPCWSTR& filename,
 						      const D3D_SHADER_MACRO *defines,
-						      const LPCWSTR& entry_point,
-						      const LPCWSTR& target); 
+						      const LPCSTR& entry_point,
+						      const LPCSTR& target);
+
+static Microsoft::WRL::ComPtr<ID3D12Resource> CreateDefaultBuffer(ID3D12Device *device,
+								 ID3D12GraphicsCommandList *cmd_list,
+								 const void *init_data,
+								 UINT64 byte_size,
+								 Microsoft::WRL::ComPtr<ID3D12Resource>& resource_buffer);
 
 
 struct SubmeshGeometry
@@ -131,13 +137,17 @@ void Release_Box(Box *box);
 void Build_Desciptor_Heaps(ID3D12Device *device, Box *box);
 void Build_Constant_Buffers(ID3D12Device *device, Box *box);
 void Build_Root_Signature(ID3D12Device *device, Box *box);
-void Build_Shaders_And_Input_Layout(ID3D12Device *device, Box *box);
-void Build_Box_Geometry(ID3D12Device *device, Box *box);
-void Build_PSO(ID3D12Device *device, Box *box); 
+void Build_Shaders_And_Input_Layout(Box *box);
+void Build_Box_Geometry(ID3D12Device *device,
+			ID3D12GraphicsCommandList* command_list, 
+			Box *box);
+void Build_PSO(ID3D12Device *device,
+	       DXGI_FORMAT back_buffer_format,
+	       DXGI_FORMAT depth_stencil_format,
+	       Box *box); 
 
 void Update(Box *box);
 void Draw(D3D* directx, Box *box);
 int Run(D3D *directx, Box *box);
-
 
 #endif

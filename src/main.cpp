@@ -13,7 +13,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
 {
   bool result = false;
   
-  D3D* directx = new D3D;
+  D3D *directx = new D3D;
   directx->directx_instance = hInstance; 
   
   result = Initialize_Main_Window(directx);
@@ -25,13 +25,22 @@ int WINAPI WinMain(HINSTANCE hInstance,
     return -1;
 
   Render(directx);
+  
+  Box *box = new Box; 
+  
+  result = Initialize_Box(directx, box);
+  if (!result)
+    return -1;
 
-  int message = Run(directx);
+  int message = Run(directx, box);
   
   if (message == 0)
     {
       Release_DirectX(directx);
       delete directx;
+
+      Release_Box(box);
+      delete box; 
     }
   
   return 0; 
